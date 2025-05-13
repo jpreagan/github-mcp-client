@@ -18,15 +18,6 @@ logging.basicConfig(
 )
 
 
-def tool_result_to_json(obj: Any) -> str:
-    """Return a JSON string suitable for the `content` field of a tool message."""
-    if isinstance(obj, BaseModel):
-        return obj.model_dump_json()
-    if is_dataclass(obj):
-        return json.dumps(asdict(obj))
-    return json.dumps(obj, default=str)
-
-
 class Configuration:
     def __init__(self) -> None:
         load_dotenv()
@@ -37,6 +28,15 @@ class Configuration:
         if not self.api_key:
             raise ValueError("LLM_API_KEY not found in environment variables")
         return self.api_key
+
+
+def tool_result_to_json(obj: Any) -> str:
+    """Return a JSON string suitable for the `content` field of a tool message."""
+    if isinstance(obj, BaseModel):
+        return obj.model_dump_json()
+    if is_dataclass(obj):
+        return json.dumps(asdict(obj))
+    return json.dumps(obj, default=str)
 
 
 class Tool:
@@ -63,11 +63,9 @@ class Server:
         self.stack = AsyncExitStack()
 
     async def initialize(self) -> None:
-        cmd = (
-            shutil.which("npx") if self.cfg["command"] == "npx" else self.cfg["command"]
-        )
+        cmd = shutil.which(self.cfg["command"])
         if cmd is None:
-            raise ValueError("command not found")
+            raise ValueError(f"Command not found: {self.cfg['command']}")
         params = StdioServerParameters(
             command=cmd,
             args=self.cfg["args"],
