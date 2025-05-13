@@ -125,6 +125,8 @@ class ChatSession:
         await self.server.initialize()
         tools = await self.server.list_tools()
         logging.info(f"Found {len(tools)} available tools from MCP server")
+        for tool in tools:
+            logging.debug(f"  - {tool.name}")
         schemas = [t.to_schema() for t in tools]
 
         msgs = [
@@ -139,7 +141,15 @@ class ChatSession:
         ]
 
         while True:
-            user = input(">>> ").strip()
+            try:
+                user = input(">>> ").strip()
+                if not user:
+                    continue
+            except EOFError:
+                break
+            except KeyboardInterrupt:
+                break
+
             msgs.append({"role": "user", "content": user})
 
             assistant = self.llm.chat(msgs, schemas)
