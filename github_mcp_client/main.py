@@ -105,8 +105,6 @@ class LLMClient:
         self,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]],
-        *,
-        stream: bool = False,
     ) -> dict[str, Any]:
         resp = self.oai.chat.completions.create(
             model=self.model,
@@ -115,27 +113,8 @@ class LLMClient:
             tool_choice="auto",
             temperature=0.7,
             max_tokens=4096,
-            stream=stream,
         )
-
-        if not stream:
-            return resp.choices[0].message.to_dict()
-
-        chunks, final_msg = [], None
-        for chunk in resp:
-            delta = chunk.choices[0].delta
-            if delta.content:
-                print(delta.content, end="", flush=True)
-                chunks.append(delta.content)
-            if delta.tool_calls:
-                final_msg = {
-                    "role": "assistant",
-                    "tool_calls": [tc.__dict__ for tc in delta.tool_calls],
-                }
-        if final_msg:
-            return final_msg
-        print()
-        return {"role": "assistant", "content": "".join(chunks)}
+        return resp.choices[0].message.to_dict()
 
 
 class ChatSession:
@@ -145,6 +124,7 @@ class ChatSession:
     async def run(self) -> None:
         await self.server.initialize()
         tools = await self.server.list_tools()
+        logging.info(f"Found {len(tools)} available tools from MCP server")
         schemas = [t.to_schema() for t in tools]
 
         msgs = [
@@ -159,9 +139,7 @@ class ChatSession:
         ]
 
         while True:
-            user = input("You: ").strip()
-            if user.lower() in {"quit", "exit"}:
-                break
+            user = input(">>> ").strip()
             msgs.append({"role": "user", "content": user})
 
             assistant = self.llm.chat(msgs, schemas)
@@ -171,8 +149,11 @@ class ChatSession:
                 for call in assistant["tool_calls"]:
                     name = call["function"]["name"]
                     args = json.loads(call["function"]["arguments"])
+                    logging.info(
+                        (f"🔧 Calling tool: {name} with params: {json.dumps(args)}")
+                    )
                     result = await self.server.execute_tool(name, args)
-
+                    logging.info(f"✅ Tool '{name}' executed successfully")
                     msgs.append(
                         {
                             "role": "tool",
@@ -181,11 +162,10 @@ class ChatSession:
                             "content": tool_result_to_json(result),
                         }
                     )
-
-                assistant = self.llm.chat(msgs, schemas, stream=True)
+                assistant = self.llm.chat(msgs, schemas)
                 msgs.append(assistant)
-            else:
-                print(f"\nAssistant: {assistant['content']}\n")
+
+            print(f"{assistant['content'].strip()}\n")
 
         await self.server.close()
 
