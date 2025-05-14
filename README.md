@@ -38,8 +38,33 @@ python main.py
 Example interaction:
 
 ```
-You: create a private repo called demo-mcp
-Assistant: Repository **demo-mcp** created ✅ (private)
+>>> Tell me about my GitHub profile.
+2025-05-13 21:11:21,187 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-13 21:11:21,196 - INFO - 🔧 Calling tool: get_me with params: {}
+2025-05-13 21:11:21,726 - INFO - ✅ Tool 'get_me' executed successfully
+2025-05-13 21:11:24,406 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
+You have 8 public repositories, 20 followers, and are following 1 user, with your account being created on December 27, 2018, and last updated on May 12, 2025.
+
+>>> Create a private repo called my-cool-repo.
+2025-05-13 21:11:28,857 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-13 21:11:28,860 - INFO - 🔧 Calling tool: create_repository with params: {"autoInit": true, "description": "null", "name": "my-cool-repo", "private": true}
+2025-05-13 21:11:30,243 - INFO - ✅ Tool 'create_repository' executed successfully
+2025-05-13 21:11:50,880 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
+The private repository "my-cool-repo" has been created.
+
+>>> What was the first issue filed in the vllm-project/vllm repo?
+2025-05-13 21:11:57,573 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-13 21:11:57,576 - INFO - 🔧 Calling tool: get_issue with params: {"issue_number": 1, "owner": "vllm-project", "repo": "vllm"}
+2025-05-13 21:11:57,894 - INFO - ✅ Tool 'get_issue' executed successfully
+2025-05-13 21:12:02,042 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
+The first issue filed in the vllm-project/vllm repo is "Fix a bug in tying OPT embeddings" and it was filed by WoosukKwon. The issue is closed and was merged on February 25, 2023.
+
+>>> What is the most recent commit in that same project?
+i2025-05-13 21:12:08,317 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-13 21:12:08,320 - INFO - 🔧 Calling tool: list_commits with params: {"owner": "vllm-project", "page": 1, "perPage": 1, "repo": "vllm", "sha": "main"}
+2025-05-13 21:12:08,706 - INFO - ✅ Tool 'list_commits' executed successfully
+2025-05-13 21:12:17,107 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
+he most recent commit in the vllm-project/vllm repo is "e7ef61c1f039a8eac98602a9e5ab7517027e7278". It was committed by majianpeng on May 14, 2025, and the commit message is "[Bugfix][Example] make lmcache v0 work. (#18051)".
 ```
 
 ## 📄 License
