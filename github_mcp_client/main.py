@@ -4,14 +4,11 @@ import logging
 import os
 import shutil
 from contextlib import AsyncExitStack
-from dataclasses import asdict, is_dataclass
-from typing import Any
 
 from dotenv import load_dotenv
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from openai import OpenAI
-from pydantic import BaseModel
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -19,33 +16,36 @@ logging.basicConfig(
 
 
 class Configuration:
-    def __init__(self) -> None:
+    def __init__(self):
         load_dotenv()
         self.api_key = os.getenv("LLM_API_KEY")
 
     @property
-    def llm_api_key(self) -> str:
+    def llm_api_key(self):
         if not self.api_key:
             raise ValueError("LLM_API_KEY not found in environment variables")
         return self.api_key
 
 
-def tool_result_to_json(obj: Any) -> str:
-    """Return a JSON string suitable for the `content` field of a tool message."""
-    if isinstance(obj, BaseModel):
-        return obj.model_dump_json()
-    if is_dataclass(obj):
-        return json.dumps(asdict(obj))
-    return json.dumps(obj, default=str)
+def tool_result_to_json(obj):
+    try:
+        return json.dumps(obj, default=str)
+    except (TypeError, ValueError):
+        try:
+            if hasattr(obj, "__dict__"):
+                return json.dumps(obj.__dict__, default=str)
+            return json.dumps(str(obj))
+        except (TypeError, ValueError):
+            return json.dumps(str(obj))
 
 
 class Tool:
-    def __init__(
-        self, name: str, description: str, input_schema: dict[str, Any]
-    ) -> None:
-        self.name, self.description, self.input_schema = name, description, input_schema
+    def __init__(self, name, description, input_schema):
+        self.name = name
+        self.description = description
+        self.input_schema = input_schema
 
-    def to_schema(self) -> dict[str, Any]:
+    def to_schema(self):
         return {
             "type": "function",
             "function": {
@@ -57,7 +57,7 @@ class Tool:
 
 
 class Server:
-    def __init__(self, name: str, cfg: dict[str, Any]) -> None:
+    def __init__(self, name, cfg):
         self.name, self.cfg = name, cfg
         self.session: ClientSession | None = None
         self.stack = AsyncExitStack()
@@ -87,46 +87,39 @@ class Server:
                 )
         return tools
 
-    async def execute_tool(self, name: str, args: dict[str, Any]) -> Any:
+    async def execute_tool(self, name, args):
         if not self.session:
             raise RuntimeError("Server not initialised")
         return await self.session.call_tool(name, args)
 
-    async def close(self) -> None:
+    async def close(self):
         await self.stack.aclose()
 
 
 class LLMClient:
-    def __init__(self, api_key: str, endpoint: str, model: str) -> None:
+    def __init__(self, api_key, endpoint, model):
         self.oai = OpenAI(api_key=api_key, base_url=endpoint)
         self.model = model
 
-    def chat(
-        self,
-        messages: list[dict[str, Any]],
-        tools: list[dict[str, Any]],
-    ) -> dict[str, Any]:
+    def chat(self, messages, tools):
         resp = self.oai.chat.completions.create(
             model=self.model,
             messages=messages,
             tools=tools,
             tool_choice="auto",
             temperature=0.7,
-            max_tokens=4096,
         )
         return resp.choices[0].message.to_dict()
 
 
 class ChatSession:
-    def __init__(self, server: Server, llm: LLMClient) -> None:
-        self.server, self.llm = server, llm
+    def __init__(self, server, llm):
+        self.server = server
+        self.llm = llm
 
-    async def run(self) -> None:
+    async def run(self):
         await self.server.initialize()
         tools = await self.server.list_tools()
-        logging.info(f"Found {len(tools)} available tools from MCP server")
-        for tool in tools:
-            logging.debug(f"  - {tool.name}")
         schemas = [t.to_schema() for t in tools]
 
         msgs = [
@@ -152,30 +145,36 @@ class ChatSession:
 
             msgs.append({"role": "user", "content": user})
 
-            assistant = self.llm.chat(msgs, schemas)
-            msgs.append(assistant)
-
-            if assistant.get("tool_calls"):
-                for call in assistant["tool_calls"]:
-                    name = call["function"]["name"]
-                    args = json.loads(call["function"]["arguments"])
-                    logging.info(
-                        (f"🔧 Calling tool: {name} with params: {json.dumps(args)}")
-                    )
-                    result = await self.server.execute_tool(name, args)
-                    logging.info(f"✅ Tool '{name}' executed successfully")
-                    msgs.append(
-                        {
-                            "role": "tool",
-                            "tool_call_id": call["id"],
-                            "name": name,
-                            "content": tool_result_to_json(result),
-                        }
-                    )
+            while True:
                 assistant = self.llm.chat(msgs, schemas)
                 msgs.append(assistant)
 
-            print(f"{assistant['content'].strip()}\n")
+                if assistant.get("tool_calls"):
+                    for call in assistant["tool_calls"]:
+                        name = call["function"]["name"]
+                        args = json.loads(call["function"]["arguments"])
+                        tool_payload_str = json.dumps(args)
+                        logging.info(
+                            f"🔧 Calling tool: {name} with params: {tool_payload_str}"
+                        )
+                        result = await self.server.execute_tool(name, args)
+                        logging.info(f"✅ Tool '{name}' executed successfully")
+                        tool_result_str = tool_result_to_json(result)
+                        msgs.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": call["id"],
+                                "name": name,
+                                "content": tool_result_str,
+                            }
+                        )
+                    continue
+
+                if "content" in assistant and assistant["content"]:
+                    print(f"{assistant['content'].strip()}\n")
+                    break
+
+                break
 
         await self.server.close()
 
@@ -191,7 +190,7 @@ async def main() -> None:
             "-e",
             "GITHUB_PERSONAL_ACCESS_TOKEN",
             "-e",
-            "GITHUB_TOOLSETS=all",
+            "GITHUB_DYNAMIC_TOOLSETS=1",
             "ghcr.io/github/github-mcp-server",
         ],
         "env": {},
@@ -199,8 +198,8 @@ async def main() -> None:
     server = Server("github", github_cfg)
     llm = LLMClient(
         api_key=cfg.llm_api_key,
-        endpoint="https://api.groq.com/openai/v1",
-        model="llama-3.3-70b-versatile",
+        endpoint="https://api.together.xyz/v1",
+        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
     )
     chat = ChatSession(server, llm)
     await chat.run()
