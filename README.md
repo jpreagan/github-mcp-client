@@ -1,12 +1,12 @@
 # GitHub MCP Client
 
-A minimal example of a simple command line chatbot that speaks the [Model Context Protocol (MCP)](https://modelcontextprotocol.io), spins up the GitHub MCP server in Docker, and chats with an LLM that can decide when to call GitHub tools.
+GitHub MCP Client is a command-line chatbot that lets you interact with GitHub using natural language using the [Model Context Protocol (MCP)](https://modelcontextprotocol.io). It launches the [GitHub MCP Server](https://github.com/github/github-mcp-server) in Docker and connects to an OpenAI-compatible LLM.
 
 ## 🔧 Prerequisites
 
 - Python ≥ 3.10
 - Docker
-- OpenAI compatible API key (e.g. Groq, OpenAI, Together)
+- OpenAI compatible API key (e.g. Together, Fireworks, Groq, OpenAI)
 
 ## 🚀 Quick start
 
@@ -25,7 +25,7 @@ pip install -r requirements.txt
 Create a file called **.env**:
 
 ```dotenv
-LLM_API_KEY=gsk_XXXXXXXXXXXXXXXXXXXXXXXX
+LLM_API_KEY=XXXXXXXXXXXXXXXXXXXXXXXX
 GITHUB_PERSONAL_ACCESS_TOKEN=ghp_XXXXXXXXXXXXXXXXXXXXXXXX
 ```
 
@@ -35,36 +35,66 @@ Then run:
 python main.py
 ```
 
-Example interaction:
+## 🧪 Example sessions
+
+Let's start with a warmpup, which requires only a single tool call:
 
 ```
->>> Tell me about my GitHub profile.
-2025-05-13 21:11:21,187 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
-2025-05-13 21:11:21,196 - INFO - 🔧 Calling tool: get_me with params: {}
-2025-05-13 21:11:21,726 - INFO - ✅ Tool 'get_me' executed successfully
-2025-05-13 21:11:24,406 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
-You have 8 public repositories, 20 followers, and are following 1 user, with your account being created on December 27, 2018, and last updated on May 12, 2025.
+GitHub MCP Server running on stdio
+>>> List five interesting facts about me on GitHub.
+2025-05-16 17:25:53,392 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-16 17:25:53,399 - INFO - 🔧 Calling tool: get_me with params: {}
+2025-05-16 17:25:53,848 - INFO - ✅ Tool 'get_me' executed successfully
+2025-05-16 17:25:58,815 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
+Sure, here are five interesting facts about you on GitHub:
 
->>> Create a private repo called my-cool-repo.
-2025-05-13 21:11:28,857 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
-2025-05-13 21:11:28,860 - INFO - 🔧 Calling tool: create_repository with params: {"autoInit": true, "description": "null", "name": "my-cool-repo", "private": true}
-2025-05-13 21:11:30,243 - INFO - ✅ Tool 'create_repository' executed successfully
-2025-05-13 21:11:50,880 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
-The private repository "my-cool-repo" has been created.
+1. **Username and Profile**: Your GitHub username is `jpreagan`, and you have a profile picture that represents you. You can be found at [this link](https://github.com/jpreagan).
 
->>> What was the first issue filed in the vllm-project/vllm repo?
-2025-05-13 21:11:57,573 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
-2025-05-13 21:11:57,576 - INFO - 🔧 Calling tool: get_issue with params: {"issue_number": 1, "owner": "vllm-project", "repo": "vllm"}
-2025-05-13 21:11:57,894 - INFO - ✅ Tool 'get_issue' executed successfully
-2025-05-13 21:12:02,042 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
-The first issue filed in the vllm-project/vllm repo is "Fix a bug in tying OPT embeddings" and it was filed by WoosukKwon. The issue is closed and was merged on February 25, 2023.
+2. **Location and Interests**: You are located in Hilo, Hawaii, and your bio mentions that you are an AI engineer who loves 80's music and udon noodles. You also have a personal website at [jpreagan.com](https://jpreagan.com/).
 
->>> What is the most recent commit in that same project?
-i2025-05-13 21:12:08,317 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
-2025-05-13 21:12:08,320 - INFO - 🔧 Calling tool: list_commits with params: {"owner": "vllm-project", "page": 1, "perPage": 1, "repo": "vllm", "sha": "main"}
-2025-05-13 21:12:08,706 - INFO - ✅ Tool 'list_commits' executed successfully
-2025-05-13 21:12:17,107 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
-he most recent commit in the vllm-project/vllm repo is "e7ef61c1f039a8eac98602a9e5ab7517027e7278". It was committed by majianpeng on May 14, 2025, and the commit message is "[Bugfix][Example] make lmcache v0 work. (#18051)".
+3. **Repositories and Gists**: You have 5 public repositories and no public gists. Additionally, you have 1 private repository.
+
+4. **Followers and Following**: You have 20 followers and are following 1 person.
+
+5. **Account History**: Your GitHub account was created on December 27, 2018, and it was last updated on May 16, 2025. You have two-factor authentication enabled, which enhances the security of your account.
+```
+
+Now let's try a query that requires multiple tool calls using dynamic toolsets:
+
+```
+GitHub MCP Server running on stdio
+>>> List my public repos.
+2025-05-16 17:18:53,033 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-16 17:18:53,042 - INFO - 🔧 Calling tool: get_me with params: {}
+2025-05-16 17:18:53,462 - INFO - ✅ Tool 'get_me' executed successfully
+2025-05-16 17:18:58,256 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-16 17:18:58,258 - INFO - 🔧 Calling tool: enable_toolset with params: {"toolset": "repos"}
+2025-05-16 17:18:58,262 - INFO - ✅ Tool 'enable_toolset' executed successfully
+2025-05-16 17:18:59,241 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
+2025-05-16 17:18:59,243 - INFO - 🔧 Calling tool: search_repositories with params: {"query": "user:jpreagan", "type": "public"}
+2025-05-16 17:18:59,645 - INFO - ✅ Tool 'search_repositories' executed successfully
+2025-05-16 17:19:04,193 - INFO - HTTP Request: POST https://api.together.xyz/v1/chat/completions "HTTP/1.1 200 OK"
+Here are your public repositories:
+
+1. **[github-mcp-client](https://github.com/jpreagan/github-mcp-client)**
+   - Description: Chatbot demo that lets an LLM handle GitHub tasks from the command line using the GitHub MCP Server 🤖🐙
+   - Language: Python
+   - Topics: llm, mcp
+
+2. **[llmnop](https://github.com/jpreagan/llmnop)**
+   - Description: A tool for measuring LLM performance metrics.
+   - Language: Rust
+   - Topics: llm, performance-metrics
+
+3. **[notebooks](https://github.com/jpreagan/notebooks)**
+   - Description: A collection of Jupyter notebooks exploring large language models (LLMs)
+   - Language: Jupyter Notebook
+   - Topics: jupyter-notebook, large-language-models, python
+
+4. **[dotfiles](https://github.com/jpreagan/dotfiles)**
+   - Description: My configuration files
+   - Language: Lua
+   - Topics: bash, dotfiles, fish, zsh
 ```
 
 ## 📄 License
