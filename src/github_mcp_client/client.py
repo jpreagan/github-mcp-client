@@ -1,30 +1,16 @@
-import asyncio
 import json
-import logging
 import os
 import shutil
 from contextlib import AsyncExitStack
 
-from dotenv import load_dotenv
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
-from openai import OpenAI
-
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
-
 
 class Configuration:
     def __init__(self):
-        load_dotenv()
-        self.api_key = os.getenv("LLM_API_KEY")
+        from dotenv import load_dotenv
 
-    @property
-    def llm_api_key(self):
-        if not self.api_key:
-            raise ValueError("LLM_API_KEY not found in environment variables")
-        return self.api_key
+        load_dotenv()
+        self.openai_api_key = os.getenv("OPENAI_API_KEY")
+        self.openai_base_url = os.getenv("OPENAI_BASE_URL")
 
 
 def tool_result_to_json(obj):
@@ -59,10 +45,13 @@ class Tool:
 class Server:
     def __init__(self, name, cfg):
         self.name, self.cfg = name, cfg
-        self.session: ClientSession | None = None
+        self.session = None
         self.stack = AsyncExitStack()
 
     async def initialize(self) -> None:
+        from mcp import ClientSession, StdioServerParameters
+        from mcp.client.stdio import stdio_client
+
         cmd = shutil.which(self.cfg["command"])
         if cmd is None:
             raise ValueError(f"Command not found: {self.cfg['command']}")
@@ -97,8 +86,13 @@ class Server:
 
 
 class LLMClient:
-    def __init__(self, api_key, endpoint, model):
-        self.oai = OpenAI(api_key=api_key, base_url=endpoint)
+    def __init__(self, api_key: str, base_url: str | None, model: str):
+        from openai import OpenAI
+
+        if base_url:
+            self.oai = OpenAI(api_key=api_key, base_url=base_url)
+        else:
+            self.oai = OpenAI(api_key=api_key)
         self.model = model
 
     def chat(self, messages, tools):
@@ -154,11 +148,11 @@ class ChatSession:
                         name = call["function"]["name"]
                         args = json.loads(call["function"]["arguments"])
                         tool_payload_str = json.dumps(args)
-                        logging.info(
+                        print(
                             f"🔧 Calling tool: {name} with params: {tool_payload_str}"
                         )
                         result = await self.server.execute_tool(name, args)
-                        logging.info(f"✅ Tool '{name}' executed successfully")
+                        print(f"✅ Tool '{name}' executed successfully")
                         tool_result_str = tool_result_to_json(result)
                         msgs.append(
                             {
@@ -179,8 +173,12 @@ class ChatSession:
         await self.server.close()
 
 
-async def main() -> None:
+async def main(model: str = "gpt-4.1") -> None:
     cfg = Configuration()
+
+    if not cfg.openai_api_key:
+        raise ValueError("API key required: set OPENAI_API_KEY environment variable")
+
     github_cfg = {
         "command": "docker",
         "args": [
@@ -189,21 +187,15 @@ async def main() -> None:
             "--rm",
             "-e",
             "GITHUB_PERSONAL_ACCESS_TOKEN",
-            "-e",
-            "GITHUB_DYNAMIC_TOOLSETS=1",
             "ghcr.io/github/github-mcp-server",
         ],
         "env": {},
     }
     server = Server("github", github_cfg)
     llm = LLMClient(
-        api_key=cfg.llm_api_key,
-        endpoint="https://api.together.xyz/v1",
-        model="Qwen/Qwen2.5-72B-Instruct-Turbo",
+        api_key=cfg.openai_api_key,
+        base_url=cfg.openai_base_url,
+        model=model,
     )
     chat = ChatSession(server, llm)
     await chat.run()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
