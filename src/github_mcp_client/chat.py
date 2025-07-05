@@ -1,5 +1,6 @@
 from typing import List, cast
 
+from mcp import types as mcp_types
 from openai import OpenAI
 from openai.types.chat import (
     ChatCompletionMessageParam,
@@ -29,7 +30,58 @@ def show_welcome(config: Config) -> None:
     """Show welcome message with status."""
     provider = get_provider_name(config.openai_base_url)
     print(f"Using {config.model} via {provider}")
+    print("Type /help for commands")
     print()
+
+
+def _handle_tools_command(tools: List[mcp_types.Tool]) -> None:
+    """Handle /tools command to show available tools."""
+    if not tools:
+        print("No tools available.\n")
+        return
+
+    print("Available tools:")
+    for tool in tools:
+        print(f"  • {tool.name}")
+        if tool.description:
+            print(f"    {tool.description}")
+    print()
+
+
+def _handle_help_command() -> None:
+    """Handle /help command to show available commands."""
+    print("Available commands:")
+    print("  /tools  - List available tools")
+    print("  /help   - Show this help message")
+    print("  /exit   - Exit the chat")
+    print()
+
+
+def _handle_exit_command() -> bool:
+    """Handle /exit command to exit the chat."""
+    print("Goodbye!")
+    return True
+
+
+def handle_command(user_input: str, tools: List[mcp_types.Tool]) -> bool:
+    """Handle REPL commands. Returns True if a command was handled."""
+    if not user_input.startswith("/"):
+        return False
+
+    command = user_input.lower().strip()
+
+    if command == "/tools":
+        _handle_tools_command(tools)
+        return True
+    elif command == "/help":
+        _handle_help_command()
+        return True
+    elif command == "/exit":
+        return _handle_exit_command()
+    else:
+        print(f"Unknown command: {command}")
+        print("Type /help for available commands.\n")
+        return True
 
 
 async def chat_loop(config: Config) -> None:
@@ -66,9 +118,10 @@ async def chat_loop(config: Config) -> None:
             if not user_input:
                 continue
 
-            if user_input.lower() == "exit":
-                print("Goodbye!")
-                return
+            if handle_command(user_input, tools):
+                if user_input.lower().strip() == "/exit":
+                    return
+                continue
 
             messages.append(
                 ChatCompletionUserMessageParam(role="user", content=user_input)
