@@ -29,10 +29,15 @@ class Server:
                 "GITHUB_PERSONAL_ACCESS_TOKEN",
                 "ghcr.io/github/github-mcp-server",
             ],
-            env={**os.environ, "GITHUB_PERSONAL_ACCESS_TOKEN": self._config.github_token},
+            env={
+                **os.environ,
+                "GITHUB_PERSONAL_ACCESS_TOKEN": self._config.github_token,
+            },
         )
         read, write = await self._stack.enter_async_context(stdio_client(params))
-        self._session = await self._stack.enter_async_context(ClientSession(read, write))
+        self._session = await self._stack.enter_async_context(
+            ClientSession(read, write)
+        )
         await self._session.initialize()
         return self
 
